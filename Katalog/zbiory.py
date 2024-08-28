@@ -64,7 +64,7 @@ def add_book():
     db.add(ksiazka)
     db.commit()
     publish_event({"action": "book_added", "book_id": ksiazka.id, "title": ksiazka.tytul})
-    return redirect(url_for('view_books'))  # Przekierowanie do listy książek po dodaniu
+    return redirect(url_for('view_books'))
 
 @app.route('/update_book/<int:book_id>', methods=['POST'])
 def update_book(book_id):
@@ -77,7 +77,7 @@ def update_book(book_id):
         ksiazka.rok_wydania = int(data.get('rok_wydania', ksiazka.rok_wydania))
         ksiazka.isbn = data.get('isbn', ksiazka.isbn)
         ksiazka.kategoria = data.get('kategoria', ksiazka.kategoria)
-        ksiazka.dostepnosc = data.get('dostepnosc') == 'on'  # Checkbox wysyła 'on', jeśli zaznaczony
+        ksiazka.dostepnosc = data.get('dostepnosc') == 'on'  
         db.commit()
         publish_event({"action": "book_updated", "book_id": ksiazka.id, "title": ksiazka.tytul})
         return redirect(url_for('view_books'))
