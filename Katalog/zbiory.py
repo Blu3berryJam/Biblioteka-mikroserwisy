@@ -111,11 +111,11 @@ def get_books():
         "dostepnosc": ksiazka.dostepnosc
     } for ksiazka in ksiazki]), 200
 
-@app.route('/', methods=['GET'])
+@app.route('/add_books', methods=['GET'])
 def index():
-    return render_template('index.html')
+    return render_template('add_book.html')
 
-@app.route('/view_books', methods=['GET'])
+@app.route('/', methods=['GET'])
 def view_books():
     db = SessionLocal()
     ksiazki = db.query(Ksiazka).all()
