@@ -25,12 +25,12 @@ Base.metadata.create_all(bind=engine)
 
 app = Flask(__name__)
 
-RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'cow.rmq2.cloudamqp.com')
-RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', 5672))
-RABBITMQ_USER = os.getenv('RABBITMQ_USER', 'cablqldr')
-RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD', '77enssqw-7f3OrFdhyXPqcbINR-tXYfj')
-RABBITMQ_VHOST = os.getenv('RABBITMQ_VHOST', 'cablqldr')
-RABBITMQ_EXCHANGE = os.getenv('RABBITMQ_EXCHANGE', 'ksiazki')
+RABBITMQ_HOST = 'cow.rmq2.cloudamqp.com'
+RABBITMQ_PORT = 5672
+RABBITMQ_USER = 'cablqldr'
+RABBITMQ_PASSWORD = '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
+RABBITMQ_VHOST = 'cablqldr'
+RABBITMQ_EXCHANGE = 'ksiazki'
 
 def publish_event(event):
     try:
@@ -77,7 +77,7 @@ def update_book(book_id):
         ksiazka.rok_wydania = int(data.get('rok_wydania', ksiazka.rok_wydania))
         ksiazka.isbn = data.get('isbn', ksiazka.isbn)
         ksiazka.kategoria = data.get('kategoria', ksiazka.kategoria)
-        ksiazka.dostepnosc = data.get('dostepnosc') == 'on'  
+        ksiazka.dostepnosc = data.get('dostepnosc') == 'on'
         db.commit()
         publish_event({"action": "book_updated", "book_id": ksiazka.id, "title": ksiazka.tytul})
         return redirect(url_for('view_books'))
