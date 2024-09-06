@@ -3,13 +3,17 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import pika
+from pika import exceptions
 import json
 import os
 
-DATABASE_URL = "sqlite:///katalog.db"
-engine = create_engine(DATABASE_URL)
+if not os.path.exists('data'):
+    os.makedirs('data')
+DATABASE_URL = "sqlite:///data/katalog.db"
+engine = create_engine(DATABASE_URL, connect_args={'timeout': 10})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 class Ksiazka(Base):
     __tablename__ = "ksiazki"
@@ -20,6 +24,7 @@ class Ksiazka(Base):
     isbn = Column(String)
     kategoria = Column(String)
     dostepnosc = Column(Boolean, default=True)
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -32,6 +37,7 @@ RABBITMQ_PASSWORD = '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
 RABBITMQ_VHOST = 'cablqldr'
 RABBITMQ_EXCHANGE = 'ksiazki'
 
+
 def publish_event(event):
     try:
         credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
@@ -39,15 +45,23 @@ def publish_event(event):
             host=RABBITMQ_HOST,
             port=RABBITMQ_PORT,
             virtual_host=RABBITMQ_VHOST,
-            credentials=credentials
+            credentials=credentials,
+            connection_attempts=3,
+            retry_delay=5,
+            socket_timeout=10
         ))
         channel = connection.channel()
         channel.exchange_declare(exchange=RABBITMQ_EXCHANGE, exchange_type='fanout')
-        channel.basic_publish(exchange=RABBITMQ_EXCHANGE, routing_key='', body=json.dumps(event))
+        channel.basic_publish(exchange=RABBITMQ_EXCHANGE, routing_key='', body=json.dumps(event).encode('utf-8'))
         connection.close()
         print(f"Zdarzenie opublikowane: {event}")
+    except exceptions.AMQPConnectionError as e:
+        print(f"Błąd połączenia: {e}")
+    except exceptions.AMQPChannelError as e:
+        print(f"Błąd kanału: {e}")
     except Exception as e:
         print(f"Błąd podczas publikowania zdarzenia do RabbitMQ: {e}")
+
 
 @app.route('/add_book', methods=['POST'])
 def add_book():
@@ -65,6 +79,7 @@ def add_book():
     db.commit()
     publish_event({"action": "book_added", "book_id": ksiazka.id, "title": ksiazka.tytul})
     return redirect(url_for('view_books'))
+
 
 @app.route('/update_book/<int:book_id>', methods=['POST'])
 def update_book(book_id):
@@ -84,6 +99,7 @@ def update_book(book_id):
     else:
         return "Książka nie znaleziona", 404
 
+
 @app.route('/delete_book', methods=['POST'])
 def delete_book_form():
     book_id = request.form['book_id']
@@ -96,6 +112,7 @@ def delete_book_form():
         return redirect(url_for('view_books'))
     else:
         return "Książka nie znaleziona", 404
+
 
 @app.route('/books', methods=['GET'])
 def get_books():
@@ -111,15 +128,18 @@ def get_books():
         "dostepnosc": ksiazka.dostepnosc
     } for ksiazka in ksiazki]), 200
 
+
 @app.route('/add_books', methods=['GET'])
 def index():
     return render_template('add_book.html')
+
 
 @app.route('/', methods=['GET'])
 def view_books():
     db = SessionLocal()
     ksiazki = db.query(Ksiazka).all()
     return render_template('view_books.html', ksiazki=ksiazki)
+
 
 @app.route('/edit_book/<int:book_id>', methods=['GET'])
 def edit_book(book_id):
@@ -130,5 +150,6 @@ def edit_book(book_id):
     else:
         return "Książka nie znaleziona", 404
 
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=8080)
