@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for
-from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import pika
@@ -36,6 +36,54 @@ RABBITMQ_USER = 'cablqldr'
 RABBITMQ_PASSWORD = '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
 RABBITMQ_VHOST = 'cablqldr'
 RABBITMQ_EXCHANGE = 'ksiazki'
+
+
+def check_rabbitmq_connection():
+    try:
+        credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+        connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            virtual_host=RABBITMQ_VHOST,
+            credentials=credentials,
+            connection_attempts=3,
+            retry_delay=5,
+            socket_timeout=10
+        ))
+        connection.close()
+        return True, None
+    except Exception as e:
+        return False, f"{e}"
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    # Sprawdzanie połączenia z bazą danych
+    db_status = "ok"
+    db_error = None
+    try:
+        db = SessionLocal()
+        connection = db.connection()
+        connection.execute(text("SELECT 1"))
+        db.close()
+    except Exception as e:
+        db_status = "error"
+        db_error = str(e)
+
+    # Sprawdzanie połączenia z RabbitMQ
+    rabbitmq_status, rabbitmq_error = check_rabbitmq_connection()
+
+    # Zwrócenie wyników w odpowiedzi JSON
+    return jsonify({
+        "database": {
+            "status": db_status,
+            "error": db_error
+        },
+        "rabbitmq": {
+            "status": "ok" if rabbitmq_status else "error",
+            "error": rabbitmq_error
+        }
+    }), 200 if db_status == "ok" and rabbitmq_status else 500
 
 
 def publish_event(event):
