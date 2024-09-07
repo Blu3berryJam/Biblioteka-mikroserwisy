@@ -7,7 +7,7 @@ rabbitmq:
   exchange: 'ksiazki'
 
 database:
-  url: "sqlite:///data/katalog.db"
+  url: "/data/katalog.db"
 
 service:
   port: 8080

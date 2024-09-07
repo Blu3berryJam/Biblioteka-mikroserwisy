@@ -9,8 +9,8 @@ from sqlalchemy import Boolean, Column, Integer, String, create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-script_dir = os.path.dirname(__file__)
 # Wczytanie konfiguracji
+script_dir = os.path.dirname(__file__)
 with open(script_dir + "/config/config.yaml", "r") as f:
     config = yaml.safe_load(f)
     DATABASE_URL = config["database"]["url"]
@@ -22,9 +22,12 @@ with open(script_dir + "/config/config.yaml", "r") as f:
     RABBITMQ_EXCHANGE = config["rabbitmq"]["exchange"]
     PORT = config["service"]["port"]
 
-if not os.path.exists("data"):
-    os.makedirs("data")
-engine = create_engine(DATABASE_URL, connect_args={"timeout": 10})
+# Inicjalizacja bazy danych
+if not os.path.exists(script_dir + "/data"):
+    os.makedirs(script_dir + "/data")
+engine = create_engine(
+    "sqlite:///" + script_dir + DATABASE_URL, connect_args={"timeout": 10}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
