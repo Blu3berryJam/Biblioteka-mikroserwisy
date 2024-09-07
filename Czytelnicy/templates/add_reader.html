@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodaj Czytelnika</title>
+</head>
+<body>
+    <h1>Dodaj Nowego Czytelnika</h1>
+    <form action="/add_reader" method="post">
+        <label for="name">Imię:</label>
+        <input type="text" id="name" name="name" required><br><br>
+
+        <label for="surname">Nazwisko:</label>
+        <input type="text" id="surname" name="surname" required><br><br>
+
+        <label for="date_of_birth">Data urodzenie:</label>
+        <input type="date" id="date_of_birth" name="date_of_birth" required><br><br>
+
+        <input type="submit" value="Dodaj Czytelnika">
+    </form>
+    <br>
+    <a href="/">Zobacz Listę Czytelników</a>
+</body>
+</html>

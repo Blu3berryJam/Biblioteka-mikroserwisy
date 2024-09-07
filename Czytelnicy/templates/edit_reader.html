@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edytuj Czytelnika</title>
+</head>
+<body>
+    <h1>Edytuj Czytelnika</h1>
+    <form action="/update_reader/{{ reader.card_number }}" method="post">
+        <label for="name">Imie:</label>
+        <input type="text" id="name" name="name" value="{{ reader.name }}" required><br><br>
+
+        <label for="surname">Nazwisko:</label>
+        <input type="text" id="surname" name="surname" value="{{ reader.surname }}" required><br><br>
+
+        <label for="date_of_birth">Data urodzenia:</label>
+        <input type="date" id="date_of_birth" name="date_of_birth" value="{{ reader.date_of_birth }}" required><br><br>
+        <input type="submit" value="Zaktualizuj Czytelnika">
+    </form>
+    <br>
+    <a href="/">Powrót Do Listy Czytelników</a>
+</body>
+</html>

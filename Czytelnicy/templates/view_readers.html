@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista Czytelników</title>
+</head>
+<body>
+    <h1>Lista Czytelników</h1>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Numer Karty Bibliotecznej</th>
+                <th>Imię</th>
+                <th>Nazwisko</th>
+                <th>Data Urodzenia</th>
+                <th>Akcje</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for reader in readers %}
+            <tr>
+                <td>{{ reader.card_number|pad(10) }}</td>
+                <td>{{ reader.name }}</td>
+                <td>{{ reader.surname }}</td>
+                <td>{{ reader.date_of_birth }}</td>
+                <td>
+                    <a href="{{ url_for('view_edit_reader_form', reader_card_num=reader.card_number) }}">Edytuj</a>
+                    <form action="/delete_reader" method="post" style="display:inline;">
+                        <input type="hidden" name="card_num" value="{{ reader.card_number }}">
+                        <input type="submit" value="Usuń">
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br>
+    <a href="/add_reader">Dodaj Nowego Czytelnika</a>
+</body>
+</html>
