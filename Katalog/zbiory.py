@@ -1,12 +1,13 @@
-import yaml
-from flask import Flask, request, jsonify, render_template, redirect, url_for
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import pika
-from pika import exceptions
 import json
 import os
+
+import pika
+import yaml
+from flask import Flask, jsonify, redirect, render_template, request, url_for
+from pika import exceptions
+from sqlalchemy import Boolean, Column, Integer, String, create_engine, text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 script_dir = os.path.dirname(__file__)
 # Wczytanie konfiguracji
