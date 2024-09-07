@@ -1,3 +1,4 @@
+import yaml
 from flask import Flask, request, jsonify, render_template, redirect, url_for
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, text
 from sqlalchemy.ext.declarative import declarative_base
@@ -7,9 +8,19 @@ from pika import exceptions
 import json
 import os
 
+with open("config/config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+    DATABASE_URL = config['database']['url']
+    RABBITMQ_HOST = config['rabbitmq']['host']
+    RABBITMQ_PORT = config['rabbitmq']['port']
+    RABBITMQ_USER = config['rabbitmq']['user']
+    RABBITMQ_PASSWORD = config['rabbitmq']['password']
+    RABBITMQ_VHOST = config['rabbitmq']['vhost']
+    RABBITMQ_EXCHANGE = config['rabbitmq']['exchange']
+    PORT = config['service']['port']
+
 if not os.path.exists('data'):
     os.makedirs('data')
-DATABASE_URL = "sqlite:///data/katalog.db"
 engine = create_engine(DATABASE_URL, connect_args={'timeout': 10})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -29,13 +40,6 @@ class Ksiazka(Base):
 Base.metadata.create_all(bind=engine)
 
 app = Flask(__name__)
-
-RABBITMQ_HOST = 'cow.rmq2.cloudamqp.com'
-RABBITMQ_PORT = 5672
-RABBITMQ_USER = 'cablqldr'
-RABBITMQ_PASSWORD = '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
-RABBITMQ_VHOST = 'cablqldr'
-RABBITMQ_EXCHANGE = 'ksiazki'
 
 
 def check_rabbitmq_connection():
@@ -200,4 +204,4 @@ def edit_book(book_id):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8080)
+    app.run(debug=True, port=PORT)
