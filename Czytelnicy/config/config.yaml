@@ -1,0 +1,13 @@
+rabbitmq:
+  host: 'cow.rmq2.cloudamqp.com'
+  port: 5672
+  user: 'cablqldr'
+  password: '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
+  vhost: 'cablqldr'
+  exchange: 'czytelnicy'
+
+database:
+  url: "/data/readers.db"
+
+service:
+  port: 8081
