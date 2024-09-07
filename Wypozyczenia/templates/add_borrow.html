@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodaj Wypożyczenie</title>
+</head>
+<body>
+    <h1>Dodaj Nowe Wypożyczenie</h1>
+    <form action="/add_borrow" method="post">
+        <label for="ksiazka_id">ID Książki:</label>
+        <input type="number" id="ksiazka_id" name="ksiazka_id" required><br><br>
+
+        <label for="czytelnik_id">ID Czytelnika:</label>
+        <input type="number" id="czytelnik_id" name="czytelnik_id" required><br><br>
+
+        <input type="submit" value="Dodaj Wypożyczenie">
+    </form>
+    <br>
+    <a href="/">Zobacz Listę Wypożyczeń</a>
+</body>
+</html>

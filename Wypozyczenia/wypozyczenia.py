@@ -1,6 +1,8 @@
+from datetime import datetime
+
 import yaml
 from flask import Flask, request, jsonify, render_template, redirect, url_for
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, text
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, Date, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import pika
@@ -8,9 +10,7 @@ from pika import exceptions
 import json
 import os
 
-script_dir = os.path.dirname(__file__)
-# Wczytanie konfiguracji
-with open(script_dir + "/config/config.yaml", "r") as f:
+with open("config/config.yaml", "r") as f:
     config = yaml.safe_load(f)
     DATABASE_URL = config['database']['url']
     RABBITMQ_HOST = config['rabbitmq']['host']
@@ -28,15 +28,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-class Ksiazka(Base):
-    __tablename__ = "ksiazki"
+class Wypozyczenie(Base):
+    __tablename__ = "wypozyczenia"
     id = Column(Integer, primary_key=True, index=True)
-    tytul = Column(String, index=True)
-    autor = Column(String, index=True)
-    rok_wydania = Column(Integer)
-    isbn = Column(String)
-    kategoria = Column(String)
-    dostepnosc = Column(Boolean, default=True)
+    ksiazka_id = Column(Integer)
+    data_wypozyczenia = Column(Date)
+    data_zwrotu = Column(Date)
+    czytelnik_id = Column(Integer)
 
 
 Base.metadata.create_all(bind=engine)
@@ -117,92 +115,82 @@ def publish_event(event):
         print(f"Błąd podczas publikowania zdarzenia do RabbitMQ: {e}")
 
 
-@app.route('/add_book', methods=['POST'])
-def add_book():
+@app.route('/add_borrow', methods=['POST'])
+def add_borrow():
     data = request.form
     db = SessionLocal()
-    ksiazka = Ksiazka(
-        tytul=data['tytul'],
-        autor=data['autor'],
-        rok_wydania=int(data['rok_wydania']),
-        isbn=data['isbn'],
-        kategoria=data['kategoria'],
-        dostepnosc=True
+    wypozyczenie = Wypozyczenie(
+        ksiazka_id=int(data['ksiazka_id']),
+        data_wypozyczenia=datetime.now().date(),
+        data_zwrotu=None,
+        czytelnik_id=int(data['czytelnik_id'])
     )
-    db.add(ksiazka)
+    db.add(wypozyczenie)
     db.commit()
-    publish_event({"action": "book_added", "book_id": ksiazka.id, "title": ksiazka.tytul})
-    return redirect(url_for('view_books'))
+    publish_event({"action": "borrow_added", "borrow_id": wypozyczenie.id, "book_id": wypozyczenie.ksiazka_id})
+    return redirect(url_for('view_borrowed_books'))
 
-
-@app.route('/update_book/<int:book_id>', methods=['POST'])
-def update_book(book_id):
+@app.route('/update_borrow/<int:borrow_id>', methods=['POST'])
+def update_borrow(borrow_id):
     data = request.form
     db = SessionLocal()
-    ksiazka = db.query(Ksiazka).filter(Ksiazka.id == book_id).first()
-    if ksiazka:
-        ksiazka.tytul = data.get('tytul', ksiazka.tytul)
-        ksiazka.autor = data.get('autor', ksiazka.autor)
-        ksiazka.rok_wydania = int(data.get('rok_wydania', ksiazka.rok_wydania))
-        ksiazka.isbn = data.get('isbn', ksiazka.isbn)
-        ksiazka.kategoria = data.get('kategoria', ksiazka.kategoria)
-        ksiazka.dostepnosc = data.get('dostepnosc') == 'on'
+    wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
+    if wypozyczenie:
+        wypozyczenie.data_wypozyczenia = datetime.strptime(data.get('data_wypozyczenia'), '%Y-%m-%d').date()
+        wypozyczenie.data_zwrotu = datetime.strptime(data.get('data_zwrotu'), '%Y-%m-%d').date() if data.get('data_zwrotu') else None
         db.commit()
-        publish_event({"action": "book_updated", "book_id": ksiazka.id, "title": ksiazka.tytul})
-        return redirect(url_for('view_books'))
+        publish_event({"action": "borrow_updated", "borrow_id": wypozyczenie.id, "book_id": wypozyczenie.ksiazka_id})
+        return redirect(url_for('view_borrowed_books'))
     else:
-        return "Książka nie znaleziona", 404
+        return "Wypożyczenie nie znalezione", 404
 
 
-@app.route('/delete_book', methods=['POST'])
-def delete_book():
-    book_id = request.form['book_id']
+@app.route('/delete_borrow', methods=['POST'])
+def delete_borrow_form():
+    borrow_id = request.form['borrow_id']
     db = SessionLocal()
-    ksiazka = db.query(Ksiazka).filter(Ksiazka.id == book_id).first()
-    if ksiazka:
-        db.delete(ksiazka)
+    wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
+    if wypozyczenie:
+        db.delete(wypozyczenie)
         db.commit()
-        publish_event({"action": "book_deleted", "book_id": ksiazka.id})
-        return redirect(url_for('view_books'))
+        publish_event({"action": "borrow_deleted", "borrow_id": wypozyczenie.id})
+        return redirect(url_for('view_borrowed_books'))
     else:
-        return "Książka nie znaleziona", 404
+        return "Wypożyczenie nie znalezione", 404
 
 
-@app.route('/books', methods=['GET'])
-def get_books():
+@app.route('/borrowings', methods=['GET'])
+def get_borrowings():
     db = SessionLocal()
-    ksiazki = db.query(Ksiazka).all()
+    wypozyczenia = db.query(Wypozyczenie).all()
     return jsonify([{
-        "id": ksiazka.id,
-        "tytul": ksiazka.tytul,
-        "autor": ksiazka.autor,
-        "rok_wydania": ksiazka.rok_wydania,
-        "isbn": ksiazka.isbn,
-        "kategoria": ksiazka.kategoria,
-        "dostepnosc": ksiazka.dostepnosc
-    } for ksiazka in ksiazki]), 200
-
-
-@app.route('/add_books', methods=['GET'])
-def index():
-    return render_template('add_book.html')
-
+        "id": wypozyczenie.id,
+        "ksiazka_id": wypozyczenie.ksiazka_id,
+        "data_wypozyczenia": wypozyczenie.data_wypozyczenia.strftime('%Y-%m-%d') if wypozyczenie.data_wypozyczenia else None,
+        "data_zwrotu": wypozyczenie.data_zwrotu.strftime('%Y-%m-%d') if wypozyczenie.data_zwrotu else None,
+        "czytelnik_id": wypozyczenie.czytelnik_id
+    } for wypozyczenie in wypozyczenia]), 200
 
 @app.route('/', methods=['GET'])
-def view_books():
+def view_borrowed_books():
     db = SessionLocal()
-    ksiazki = db.query(Ksiazka).all()
-    return render_template('view_books.html', ksiazki=ksiazki)
+    wypozyczenia = db.query(Wypozyczenie).all()
+    return render_template('view_borrowed_books.html', wypozyczenia=wypozyczenia)
 
 
-@app.route('/edit_book/<int:book_id>', methods=['GET'])
-def edit_book(book_id):
+@app.route('/add_borrow', methods=['GET'])
+def add_borrow_form():
+    return render_template('add_borrow.html')
+
+
+@app.route('/edit_borrow/<int:borrow_id>', methods=['GET'])
+def edit_borrow(borrow_id):
     db = SessionLocal()
-    ksiazka = db.query(Ksiazka).filter(Ksiazka.id == book_id).first()
-    if ksiazka:
-        return render_template('edit_book.html', ksiazka=ksiazka)
+    wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
+    if wypozyczenie:
+        return render_template('edit_borrow.html', wypozyczenie=wypozyczenie)
     else:
-        return "Książka nie znaleziona", 404
+        return "Wypożyczenie nie znalezione", 404
 
 
 if __name__ == '__main__':

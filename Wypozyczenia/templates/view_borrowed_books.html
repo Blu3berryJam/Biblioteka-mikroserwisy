@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista Wypożyczeń</title>
+</head>
+<body>
+    <h1>Lista Wypożyczeń</h1>
+    <table border="1">
+        <tr>
+            <th>ID</th>
+            <th>ID Książki</th>
+            <th>Data Wypożyczenia</th>
+            <th>Data Zwrotu</th>
+            <th>ID Czytelnika</th>
+            <th>Opcje</th>
+        </tr>
+        {% for wypozyczenie in wypozyczenia %}
+        <tr>
+            <td>{{ wypozyczenie.id }}</td>
+            <td>{{ wypozyczenie.ksiazka_id }}</td>
+            <td>{{ wypozyczenie.data_wypozyczenia.strftime('%Y-%m-%d') }}</td>
+            <td>{{ wypozyczenie.data_zwrotu.strftime('%Y-%m-%d') if wypozyczenie.data_zwrotu else 'Brak' }}</td>
+            <td>{{ wypozyczenie.czytelnik_id }}</td>
+            <td>
+                <a href="/edit_borrow/{{ wypozyczenie.id }}">Edytuj</a>
+                <form action="/delete_borrow" method="post" style="display:inline;">
+                    <input type="hidden" name="borrow_id" value="{{ wypozyczenie.id }}">
+                    <input type="submit" value="Usuń">
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/add_borrow">Dodaj Nowe Wypożyczenie</a>
+</body>
+</html>
