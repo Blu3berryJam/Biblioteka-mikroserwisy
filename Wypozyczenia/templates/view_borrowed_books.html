@@ -29,6 +29,10 @@
                     <input type="hidden" name="borrow_id" value="{{ wypozyczenie.id }}">
                     <input type="submit" value="Usuń">
                 </form>
+                <form action="/return_borrow" method="post" style="display:inline;">
+                    <input type="hidden" name="borrow_id" value="{{ wypozyczenie.id }}">
+                    <input type="submit" value="Zwróć Książkę">
+                </form>
             </td>
         </tr>
         {% endfor %}

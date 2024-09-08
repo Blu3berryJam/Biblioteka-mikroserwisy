@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime
 
 import yaml
@@ -127,8 +128,29 @@ def add_borrow():
     )
     db.add(wypozyczenie)
     db.commit()
-    publish_event({"action": "borrow_added", "borrow_id": wypozyczenie.id, "book_id": wypozyczenie.ksiazka_id})
+    publish_event({"action": "book_borrowed", "borrow_id": wypozyczenie.id, "book_id": wypozyczenie.ksiazka_id})
     return redirect(url_for('view_borrowed_books'))
+
+
+@app.route('/return_borrow', methods=['POST'])
+def return_borrow():
+    borrow_id = request.form['borrow_id']
+    db = SessionLocal()
+
+    wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
+    if wypozyczenie:
+        wypozyczenie.data_zwrotu = datetime.now()
+        db.commit()
+
+        # Wysyłamy zdarzenie do RabbitMQ
+        publish_event({
+            "action": "book_returned",
+            "borrow_id": wypozyczenie.id,
+            "book_id": wypozyczenie.ksiazka_id
+        })
+
+    return redirect(url_for('view_borrowed_books'))
+
 
 @app.route('/update_borrow/<int:borrow_id>', methods=['POST'])
 def update_borrow(borrow_id):
@@ -137,7 +159,8 @@ def update_borrow(borrow_id):
     wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
     if wypozyczenie:
         wypozyczenie.data_wypozyczenia = datetime.strptime(data.get('data_wypozyczenia'), '%Y-%m-%d').date()
-        wypozyczenie.data_zwrotu = datetime.strptime(data.get('data_zwrotu'), '%Y-%m-%d').date() if data.get('data_zwrotu') else None
+        wypozyczenie.data_zwrotu = datetime.strptime(data.get('data_zwrotu'), '%Y-%m-%d').date() if data.get(
+            'data_zwrotu') else None
         db.commit()
         publish_event({"action": "borrow_updated", "borrow_id": wypozyczenie.id, "book_id": wypozyczenie.ksiazka_id})
         return redirect(url_for('view_borrowed_books'))
@@ -146,14 +169,14 @@ def update_borrow(borrow_id):
 
 
 @app.route('/delete_borrow', methods=['POST'])
-def delete_borrow_form():
+def delete_borrow():
     borrow_id = request.form['borrow_id']
     db = SessionLocal()
     wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
     if wypozyczenie:
         db.delete(wypozyczenie)
         db.commit()
-        publish_event({"action": "borrow_deleted", "borrow_id": wypozyczenie.id})
+        publish_event({"action": "borrow_deleted", "borrow_id": wypozyczenie.id, "book_id": wypozyczenie.ksiazka_id})
         return redirect(url_for('view_borrowed_books'))
     else:
         return "Wypożyczenie nie znalezione", 404
@@ -166,10 +189,12 @@ def get_borrowings():
     return jsonify([{
         "id": wypozyczenie.id,
         "ksiazka_id": wypozyczenie.ksiazka_id,
-        "data_wypozyczenia": wypozyczenie.data_wypozyczenia.strftime('%Y-%m-%d') if wypozyczenie.data_wypozyczenia else None,
+        "data_wypozyczenia": wypozyczenie.data_wypozyczenia.strftime(
+            '%Y-%m-%d') if wypozyczenie.data_wypozyczenia else None,
         "data_zwrotu": wypozyczenie.data_zwrotu.strftime('%Y-%m-%d') if wypozyczenie.data_zwrotu else None,
         "czytelnik_id": wypozyczenie.czytelnik_id
     } for wypozyczenie in wypozyczenia]), 200
+
 
 @app.route('/', methods=['GET'])
 def view_borrowed_books():
@@ -193,5 +218,49 @@ def edit_borrow(borrow_id):
         return "Wypożyczenie nie znalezione", 404
 
 
+# Funkcja do przetwarzania wiadomości z RabbitMQ
+def process_message(ch, method, properties, body):
+    event = json.loads(body)
+    print(f"Odebrano zdarzenie: {event}")
+
+    db = SessionLocal()
+
+    if event['action'] == 'book_borrowed_response':
+        wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == event['borrow_id'],
+                                                     Wypozyczenie.ksiazka_id == event['book_id']).first()
+        if wypozyczenie:
+            if event['status'] == 'book_successfully_borrowed':
+                print(f"Książka ID {event['book_id']} została wypożyczona.")
+            elif event['status'] == 'book_borrow_denied':
+                db.delete(wypozyczenie)
+                db.commit()
+                print(f"Próba wypożyczenia książki ID {event['book_id']} została odrzucona.")
+
+    db.close()
+
+
+# Funkcja do nasłuchiwania RabbitMQ
+def start_rabbitmq_listener():
+    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+    connection = pika.BlockingConnection(pika.ConnectionParameters(
+        host=RABBITMQ_HOST,
+        port=RABBITMQ_PORT,
+        virtual_host=RABBITMQ_VHOST,
+        credentials=credentials
+    ))
+    channel = connection.channel()
+    channel.exchange_declare(exchange=RABBITMQ_EXCHANGE, exchange_type='fanout')
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+    channel.queue_bind(exchange=RABBITMQ_EXCHANGE, queue=queue_name)
+
+    print(' [*] Oczekiwanie na wiadomości. Aby zakończyć naciśnij CTRL+C')
+
+    channel.basic_consume(queue=queue_name, on_message_callback=process_message, auto_ack=True)
+    channel.start_consuming()
+
+
 if __name__ == '__main__':
+    listener_thread = threading.Thread(target=start_rabbitmq_listener, daemon=True)
+    listener_thread.start()
     app.run(debug=True, port=PORT)
