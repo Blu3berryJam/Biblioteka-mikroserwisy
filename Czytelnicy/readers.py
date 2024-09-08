@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 from datetime import datetime
 
 import pika
@@ -21,7 +22,7 @@ with open(script_dir + "/config/config.yaml", "r") as f:
     RABBITMQ_VHOST = config["rabbitmq"]["vhost"]
     RABBITMQ_EXCHANGE = config["rabbitmq"]["exchange"]
     PORT = config["service"]["port"]
-
+    DEBUG = config['service']['debug']
 
 # Inicjalizacja bazy danych
 if not os.path.exists(script_dir + "/data"):
@@ -124,7 +125,6 @@ def get_readers():
 def view_readers():
     db = SessionLocal()
     readers = db.query(Reader)
-    print(readers)
     readers = readers.all()
     return render_template("view_readers.html", readers=readers)
 
@@ -226,10 +226,55 @@ def health_check():
     ), (200 if db_status == "ok" and rabbitmq_status else 500)
 
 
+def process_message(ch, method, properties, body):
+    event = json.loads(body)
+    print(f"Odebrano zdarzenie: {event}")
+
+    # Sprawdzanie, czy zdarzenie to wypożyczenie książki
+    db = SessionLocal()
+
+    if event['action'] == 'book_borrowed':
+        reader = db.query(Reader).filter(Reader.card_number == event['reader_id']).first()
+        if reader:
+            publish_event(
+                {"action": "book_borrowed_response", "status": "reader_exist", "borrow_id": event['borrow_id'],
+                 "book_id": event['book_id']})
+        else:
+            publish_event(
+                {"action": "book_borrowed_response", "status": "reader_not_exist", "borrow_id": event['borrow_id'],
+                 "book_id": event['book_id']})
+    db.close()
+
+
+# Funkcja do nasłuchiwania RabbitMQ
+def start_rabbitmq_listener():
+    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+    connection = pika.BlockingConnection(pika.ConnectionParameters(
+        host=RABBITMQ_HOST,
+        port=RABBITMQ_PORT,
+        virtual_host=RABBITMQ_VHOST,
+        credentials=credentials
+    ))
+    channel = connection.channel()
+    channel.exchange_declare(exchange=RABBITMQ_EXCHANGE, exchange_type='fanout')
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+    channel.queue_bind(exchange=RABBITMQ_EXCHANGE, queue=queue_name)
+
+    print(' [*] Oczekiwanie na wiadomości. Aby zakończyć naciśnij CTRL+C')
+
+    channel.basic_consume(queue=queue_name, on_message_callback=process_message, auto_ack=True)
+    channel.start_consuming()
+
+
 @app.template_filter("pad")
 def pad(value, length):
     return str(value).zfill(length)
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=PORT)
+    listener_thread = threading.Thread(target=start_rabbitmq_listener, daemon=True)
+    listener_thread.start()
+
+
+    app.run(debug=DEBUG, port=PORT)

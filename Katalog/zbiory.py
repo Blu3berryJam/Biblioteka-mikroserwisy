@@ -20,6 +20,7 @@ with open(script_dir + "/config/config.yaml", "r") as f:
     RABBITMQ_VHOST = config['rabbitmq']['vhost']
     RABBITMQ_EXCHANGE = config['rabbitmq']['exchange']
     PORT = config['service']['port']
+    DEBUG = config['service']['debug']
 
 if not os.path.exists('data'):
     os.makedirs('data')
@@ -210,7 +211,6 @@ def edit_book(book_id):
         return "Książka nie znaleziona", 404
 
 
-# Funkcja do przetwarzania wiadomości z RabbitMQ
 def process_message(ch, method, properties, body):
     event = json.loads(body)
     print(f"Odebrano zdarzenie: {event}")
@@ -222,9 +222,7 @@ def process_message(ch, method, properties, body):
         ksiazka = db.query(Ksiazka).filter(Ksiazka.id == event['book_id']).first()
         if ksiazka:
             if ksiazka.dostepnosc == True:
-                ksiazka.dostepnosc = False
-                db.commit()
-                print(f"Książka ID {ksiazka.id} została wypożyczona.")
+
                 publish_event(
                     {"action": "book_borrowed_response", "status": "book_successfully_borrowed", "borrow_id": event['borrow_id'], "book_id": event['book_id']})
             else:
@@ -234,6 +232,13 @@ def process_message(ch, method, properties, body):
             publish_event(
                 {"action": "book_borrowed_response", "status": "book_borrow_denied", "borrow_id": event['borrow_id'],
                  "book_id": event['book_id']})
+    elif event['action'] == "book_borrowed_successfully":
+        ksiazka = db.query(Ksiazka).filter(Ksiazka.id == event['book_id']).first()
+        if ksiazka:
+            ksiazka.dostepnosc = False
+            db.commit()
+            print(f"Książka ID {ksiazka.id} została wypożyczona.")
+
     elif event['action'] == 'book_returned' or event['action'] == 'borrow_deleted':
         ksiazka = db.query(Ksiazka).filter(Ksiazka.id == event['book_id']).first()
         if ksiazka:
@@ -272,4 +277,4 @@ if __name__ == '__main__':
     listener_thread.start()
 
     # Uruchomienie serwera Flask
-    app.run(debug=True, port=PORT)
+    app.run(debug=DEBUG, port=PORT)

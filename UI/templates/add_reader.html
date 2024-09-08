@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dodaj Czytelnika</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Dodaj Czytelnika</h1>
+    <form action="{{ url_for('add_reader') }}" method="post">
+        <label for="name">Imię:</label>
+        <input type="text" id="name" name="name" required><br><br>
+
+        <label for="surname">Nazwisko:</label>
+        <input type="text" id="surname" name="surname" required><br><br>
+
+        <label for="date_of_birth">Data Urodzenia:</label>
+        <input type="date" id="date_of_birth" name="date_of_birth" required><br><br>
+
+
+        <button type="submit">Dodaj</button>
+    </form>
+
+    <a href="{{ url_for('index') }}">Powrót do Strony Głównej</a>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dateInput = document.getElementById('date_of_birth');
+        const today = new Date();
+        const fourYearsAgo = new Date(today.getFullYear() - 4, today.getMonth(), today.getDate());
+        dateInput.max = fourYearsAgo.toISOString().split('T')[0];
+    });
+</script>
+</html>

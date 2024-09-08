@@ -4,10 +4,11 @@ rabbitmq:
   user: 'cablqldr'
   password: '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
   vhost: 'cablqldr'
-  exchange: 'czytelnicy'
+  exchange: 'ksiazki'
 
 database:
   url: "/data/readers.db"
 
 service:
   port: 8081
+  debug: False

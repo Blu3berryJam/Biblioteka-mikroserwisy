@@ -29,7 +29,7 @@
                     <input type="hidden" name="borrow_id" value="{{ wypozyczenie.id }}">
                     <input type="submit" value="Usuń">
                 </form>
-                <form action="/return_borrow" method="post" style="display:inline;">
+                <form action="/return_book" method="post" style="display:inline;">
                     <input type="hidden" name="borrow_id" value="{{ wypozyczenie.id }}">
                     <input type="submit" value="Zwróć Książkę">
                 </form>
@@ -37,6 +37,6 @@
         </tr>
         {% endfor %}
     </table>
-    <a href="/add_borrow">Dodaj Nowe Wypożyczenie</a>
+    <a href="/borrow_book">Dodaj Nowe Wypożyczenie</a>
 </body>
 </html>

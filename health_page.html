@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Status Systemu</title>
+    <style>
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 18px;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .error {
+            color: red;
+        }
+        .ok {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Status Systemu</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Komponent</th>
+                <th>Status</th>
+                <th>Informacje</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Baza danych</td>
+                <td class="{{ 'ok' if db_status == 'ok' else 'error' }}">{{ db_status }}</td>
+                <td>{{ db_error if db_status == 'error' else 'Brak' }}</td>
+            </tr>
+            <tr>
+                <td>RabbitMQ</td>
+                <td class="{{ 'ok' if rabbitmq_status else 'error' }}">{{ 'ok' if rabbitmq_status else 'error' }}</td>
+                <td>{{ rabbitmq_error if not rabbitmq_status else 'Brak' }}</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

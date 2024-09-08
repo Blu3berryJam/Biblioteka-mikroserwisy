@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biblioteka</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Biblioteka</h1>
+
+    <div class="section">
+        <h2>
+            Czytelnicy
+            <div class="button-group">
+                <button class="toggle-btn" data-section="readers">▼</button>
+                <button class="refresh-btn" data-url="{{ url_for('fetch_readers') }}">🔄</button>
+                <a href="{{ url_for('add_reader_form') }}" class="add-link">Dodaj Czytelnika</a>
+            </div>
+        </h2>
+        <table id="readersTable" class="hidden">
+            <thead>
+                <tr>
+                    <th>Numer Karty</th>
+                    <th>Imię</th>
+                    <th>Nazwisko</th>
+                    <th>Data Urodzenia</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Dane będą załadowane przez JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>
+            Książki
+            <div class="button-group">
+                <button class="toggle-btn" data-section="books">▼</button>
+                <button class="refresh-btn" data-url="{{ url_for('fetch_books') }}">🔄</button>
+            </div>
+        </h2>
+        <table id="booksTable" class="hidden">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tytuł</th>
+                    <th>Autor</th>
+                    <th>Rok Wydania</th>
+                    <th>ISBN</th>
+                    <th>Kategoria</th>
+                    <th>Dostępność</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Dane będą załadowane przez JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>
+            Wypożyczenia
+            <div class="button-group">
+                <button class="toggle-btn" data-section="borrowings">▼</button>
+                <button class="refresh-btn" data-url="{{ url_for('fetch_borrowings') }}">🔄</button>
+            </div>
+        </h2>
+        <table id="borrowingsTable" class="hidden">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>ID Książki</th>
+                    <th>Data Wypożyczenia</th>
+                    <th>Data Zwrotu</th>
+                    <th>ID Czytelnika</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Dane będą załadowane przez JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+</body>
+</html>

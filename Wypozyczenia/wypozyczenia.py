@@ -1,30 +1,35 @@
 import json
 import os
 import threading
+import time
 from datetime import datetime
 
 import pika
 import yaml
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from pika import exceptions
-from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, String, create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-with open("config/config.yaml", "r") as f:
+script_dir = os.path.dirname(__file__)
+with open(script_dir + "/config/config.yaml", "r") as f:
     config = yaml.safe_load(f)
-    DATABASE_URL = config["database"]["url"]
-    RABBITMQ_HOST = config["rabbitmq"]["host"]
-    RABBITMQ_PORT = config["rabbitmq"]["port"]
-    RABBITMQ_USER = config["rabbitmq"]["user"]
-    RABBITMQ_PASSWORD = config["rabbitmq"]["password"]
-    RABBITMQ_VHOST = config["rabbitmq"]["vhost"]
-    RABBITMQ_EXCHANGE = config["rabbitmq"]["exchange"]
-    PORT = config["service"]["port"]
+    DATABASE_URL = config['database']['url']
+    RABBITMQ_HOST = config['rabbitmq']['host']
+    RABBITMQ_PORT = config['rabbitmq']['port']
+    RABBITMQ_USER = config['rabbitmq']['user']
+    RABBITMQ_PASSWORD = config['rabbitmq']['password']
+    RABBITMQ_VHOST = config['rabbitmq']['vhost']
+    RABBITMQ_EXCHANGE = config['rabbitmq']['exchange']
+    PORT = config['service']['port']
+    DEBUG = config['service']['debug']
 
-if not os.path.exists("data"):
-    os.makedirs("data")
-engine = create_engine(DATABASE_URL, connect_args={"timeout": 10})
+if not os.path.exists('data'):
+    os.makedirs('data')
+engine = create_engine(
+    "sqlite:///" + script_dir + DATABASE_URL, connect_args={"timeout": 10}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -36,11 +41,50 @@ class Wypozyczenie(Base):
     data_wypozyczenia = Column(Date)
     data_zwrotu = Column(Date)
     czytelnik_id = Column(Integer)
+    private_id = Column(Integer, unique=True)
 
+
+class ID(Base):
+    __tablename__ = "id"
+    id = Column(Integer, primary_key=True, index=True)
+    current_id = Column(Integer, unique=True)
+
+
+class BORROW_APPROVAL:
+    def __init__(self):
+        self.borrow_id = None
+        self.reader = None
+        self.book = None
+
+
+borrow_status = BORROW_APPROVAL()
 
 Base.metadata.create_all(bind=engine)
 
 app = Flask(__name__)
+
+
+def clear_borrow_status():
+    borrow_status.borrow_id = None
+    borrow_status.book = None
+    borrow_status.reader = None
+
+
+def get_current_id():
+    db = SessionLocal()
+    current_id = db.query(ID).first()
+    if not current_id:
+        current_id = ID(
+            current_id=0
+        )
+        db.add(current_id)
+    else:
+        current_id.current_id = current_id.current_id + 1
+    id_to_return = current_id.current_id
+    db.commit()
+    db.close()
+
+    return id_to_return
 
 
 def check_rabbitmq_connection():
@@ -123,7 +167,7 @@ def publish_event(event):
         print(f"Błąd podczas publikowania zdarzenia do RabbitMQ: {e}")
 
 
-@app.route("/add_borrow", methods=["POST"])
+@app.route('/borrow_book', methods=['POST'])
 def add_borrow():
     data = request.form
     db = SessionLocal()
@@ -132,25 +176,49 @@ def add_borrow():
         data_wypozyczenia=datetime.now().date(),
         data_zwrotu=None,
         czytelnik_id=int(data["czytelnik_id"]),
+        private_id=get_current_id()
     )
-    db.add(wypozyczenie)
-    db.commit()
+    borrow_status.borrow_id = wypozyczenie.private_id
+
     publish_event(
         {
             "action": "book_borrowed",
-            "borrow_id": wypozyczenie.id,
+            "borrow_id": wypozyczenie.private_id,
             "book_id": wypozyczenie.ksiazka_id,
+            "reader_id": wypozyczenie.czytelnik_id,
         }
     )
+    start_time = time.time()
+    while True:
+        if borrow_status.book is True and borrow_status.reader is True:
+            db.add(wypozyczenie)
+            db.commit()
+            publish_event(
+                {
+                    "action": "book_borrowed_successfully",
+                    "book_id": wypozyczenie.ksiazka_id,
+                }
+            )
+            clear_borrow_status()
+            break
+        elif borrow_status.book is False or borrow_status.reader is False:
+            print("Nie udało się wypożyczyć!")
+            clear_borrow_status()
+            break
+        elif time.time() - start_time > 10:
+            print("Limit czasu osiągnięty!")
+            clear_borrow_status()
+            break
+
     return redirect(url_for("view_borrowed_books"))
 
 
-@app.route("/return_borrow", methods=["POST"])
-def return_borrow():
-    borrow_id = request.form["borrow_id"]
+@app.route('/return_book', methods=['POST'])
+def return_book():
+    borrow_id = request.form['borrow_id']
     db = SessionLocal()
 
-    wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
+    wypozyczenie = db.query(Wypozyczenie).filter_by(id=borrow_id).first()
     if wypozyczenie:
         wypozyczenie.data_zwrotu = datetime.now()
         db.commit()
@@ -159,7 +227,7 @@ def return_borrow():
         publish_event(
             {
                 "action": "book_returned",
-                "borrow_id": wypozyczenie.id,
+                "borrow_id": wypozyczenie.private_id,
                 "book_id": wypozyczenie.ksiazka_id,
             }
         )
@@ -202,13 +270,14 @@ def delete_borrow():
     if wypozyczenie:
         db.delete(wypozyczenie)
         db.commit()
-        publish_event(
-            {
-                "action": "borrow_deleted",
-                "borrow_id": wypozyczenie.id,
-                "book_id": wypozyczenie.ksiazka_id,
-            }
-        )
+        if wypozyczenie.data_zwrotu is None:
+            publish_event(
+                {
+                    "action": "borrow_deleted",
+                    "borrow_id": wypozyczenie.id,
+                    "book_id": wypozyczenie.ksiazka_id,
+                }
+            )
         return redirect(url_for("view_borrowed_books"))
     else:
         return "Wypożyczenie nie znalezione", 404
@@ -250,7 +319,7 @@ def view_borrowed_books():
     return render_template("view_borrowed_books.html", wypozyczenia=wypozyczenia)
 
 
-@app.route("/add_borrow", methods=["GET"])
+@app.route('/borrow_book', methods=['GET'])
 def add_borrow_form():
     return render_template("add_borrow.html")
 
@@ -270,28 +339,20 @@ def process_message(ch, method, properties, body):
     event = json.loads(body)
     print(f"Odebrano zdarzenie: {event}")
 
-    db = SessionLocal()
-
     if event["action"] == "book_borrowed_response":
-        wypozyczenie = (
-            db.query(Wypozyczenie)
-            .filter(
-                Wypozyczenie.id == event["borrow_id"],
-                Wypozyczenie.ksiazka_id == event["book_id"],
+        if event["status"] == "book_successfully_borrowed":
+            if borrow_status.borrow_id == event["borrow_id"]:
+                borrow_status.book = True
+        elif event["status"] == "reader_exist":
+            if borrow_status.borrow_id == event["borrow_id"]:
+                borrow_status.reader = True
+        elif event["status"] == "book_borrow_denied" or event["status"] == "reader_not_exist":
+            if borrow_status.borrow_id == event["borrow_id"]:
+                borrow_status.book = False
+                borrow_status.reader = False
+            print(
+                f"Próba wypożyczenia książki ID {event['book_id']} została odrzucona."
             )
-            .first()
-        )
-        if wypozyczenie:
-            if event["status"] == "book_successfully_borrowed":
-                print(f"Książka ID {event['book_id']} została wypożyczona.")
-            elif event["status"] == "book_borrow_denied":
-                db.delete(wypozyczenie)
-                db.commit()
-                print(
-                    f"Próba wypożyczenia książki ID {event['book_id']} została odrzucona."
-                )
-
-    db.close()
 
 
 # Funkcja do nasłuchiwania RabbitMQ
@@ -322,4 +383,4 @@ def start_rabbitmq_listener():
 if __name__ == "__main__":
     listener_thread = threading.Thread(target=start_rabbitmq_listener, daemon=True)
     listener_thread.start()
-    app.run(debug=True, port=PORT)
+    app.run(debug=DEBUG, port=PORT)
