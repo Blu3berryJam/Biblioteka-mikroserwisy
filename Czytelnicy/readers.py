@@ -194,7 +194,7 @@ def update_reader(reader_card_num):
         )
         return redirect(url_for("view_readers"))
     else:
-        return "Książka nie znaleziona", 404
+        return "Czytelnik nie znaleziony", 404
 
 
 @app.route("/health", methods=["GET"])

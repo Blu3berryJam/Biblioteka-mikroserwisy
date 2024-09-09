@@ -22,6 +22,7 @@ with open(script_dir + "/config/config.yaml", "r") as f:
     RABBITMQ_PASSWORD = config['rabbitmq']['password']
     RABBITMQ_VHOST = config['rabbitmq']['vhost']
     RABBITMQ_EXCHANGE = config['rabbitmq']['exchange']
+    RABBITMQ_EXCHANGE_2 = config['rabbitmq']['readers_exchange']
     PORT = config['service']['port']
     DEBUG = config['service']['debug']
 
@@ -136,7 +137,7 @@ def health_check():
     ), (200 if db_status == "ok" and rabbitmq_status else 500)
 
 
-def publish_event(event):
+def publish_event(event, exchange=RABBITMQ_EXCHANGE):
     try:
         credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
         connection = pika.BlockingConnection(
@@ -151,9 +152,9 @@ def publish_event(event):
             )
         )
         channel = connection.channel()
-        channel.exchange_declare(exchange=RABBITMQ_EXCHANGE, exchange_type="fanout")
+        channel.exchange_declare(exchange=exchange, exchange_type="fanout")
         channel.basic_publish(
-            exchange=RABBITMQ_EXCHANGE,
+            exchange=exchange,
             routing_key="",
             body=json.dumps(event).encode("utf-8"),
         )
@@ -180,15 +181,15 @@ def add_borrow():
         private_id=get_current_id()
     )
     borrow_status.borrow_id = wypozyczenie.private_id
-
-    publish_event(
-        {
+    event = {
             "action": "book_borrowed",
             "borrow_id": wypozyczenie.private_id,
             "book_id": wypozyczenie.ksiazka_id,
             "reader_id": wypozyczenie.czytelnik_id,
         }
-    )
+
+    publish_event(event)
+    publish_event(event, RABBITMQ_EXCHANGE_2)
     start_time = time.time()
     status = 200
     while True:
@@ -227,7 +228,6 @@ def return_book():
         wypozyczenie.data_zwrotu = datetime.now()
         db.commit()
 
-        # Wysyłamy zdarzenie do RabbitMQ
         publish_event(
             {
                 "action": "book_returned",
@@ -360,8 +360,14 @@ def process_message(ch, method, properties, body):
             )
 
 
+def start_books_listener():
+    start_rabbitmq_listener(RABBITMQ_EXCHANGE)
+
+def start_readers_listener():
+    start_rabbitmq_listener(RABBITMQ_EXCHANGE_2)
+
 # Funkcja do nasłuchiwania RabbitMQ
-def start_rabbitmq_listener():
+def start_rabbitmq_listener(exchange):
     credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(
@@ -372,12 +378,13 @@ def start_rabbitmq_listener():
         )
     )
     channel = connection.channel()
-    channel.exchange_declare(exchange=RABBITMQ_EXCHANGE, exchange_type="fanout")
+    channel.exchange_declare(exchange=exchange, exchange_type="fanout")
     result = channel.queue_declare(queue="", exclusive=True)
     queue_name = result.method.queue
-    channel.queue_bind(exchange=RABBITMQ_EXCHANGE, queue=queue_name)
+    channel.queue_bind(exchange=exchange, queue=queue_name)
 
     print(" [*] Oczekiwanie na wiadomości. Aby zakończyć naciśnij CTRL+C")
+    print(exchange)
 
     channel.basic_consume(
         queue=queue_name, on_message_callback=process_message, auto_ack=True
@@ -386,6 +393,8 @@ def start_rabbitmq_listener():
 
 
 if __name__ == "__main__":
-    listener_thread = threading.Thread(target=start_rabbitmq_listener, daemon=True)
+    listener_thread = threading.Thread(target=start_books_listener, daemon=True)
+    listener_thread_2 = threading.Thread(target=start_readers_listener, daemon=True)
     listener_thread.start()
+    listener_thread_2.start()
     app.run(debug=DEBUG, port=PORT)

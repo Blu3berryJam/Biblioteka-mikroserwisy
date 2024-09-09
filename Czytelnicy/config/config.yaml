@@ -4,7 +4,7 @@ rabbitmq:
   user: 'cablqldr'
   password: '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
   vhost: 'cablqldr'
-  exchange: 'ksiazki'
+  exchange: 'czytelnicy'
 
 database:
   url: "/data/readers.db"

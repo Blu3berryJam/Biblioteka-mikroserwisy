@@ -5,6 +5,7 @@ rabbitmq:
   password: '77enssqw-7f3OrFdhyXPqcbINR-tXYfj'
   vhost: 'cablqldr'
   exchange: 'ksiazki'
+  readers_exchange: 'czytelnicy'
 
 database:
   url: "/data/wypozyczenia.db"
