@@ -1,5 +1,3 @@
-// static/scripts.js
-
 document.addEventListener('DOMContentLoaded', () => {
     // Funkcja do ładowania danych w tabeli
     const loadTableData = (url, sectionId) => {
@@ -18,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         data_urodzenia: 'Data Urodzenia'
                     },
                     books: {
-                        id: 'ID',
+                        id_ksiazki: 'ID',
                         tytul: 'Tytuł',
                         autor: 'Autor',
                         rok_wydania: 'Rok Wydania',
@@ -27,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         dostepnosc: 'Dostępność'
                     },
                     borrowings: {
-                        id: 'ID',
+                        id_wypozyczenia: 'ID',
                         ksiazka_id: 'ID Książki',
                         data_wypozyczenia: 'Data Wypożyczenia',
                         data_zwrotu: 'Data Zwrotu',
@@ -41,10 +39,109 @@ document.addEventListener('DOMContentLoaded', () => {
                     const row = document.createElement('tr');
                     Object.keys(mappings).forEach(key => {
                         const cell = document.createElement('td');
-                        cell.textContent = item[key] !== undefined ? item[key] : 'Brak';
+                        if (key === 'dostepnosc' && sectionId === 'books') {
+                            cell.innerHTML = item[key] ? '✔️' : '❌';
+                        } else {
+                            cell.textContent = item[key] !== undefined ? item[key] : 'Brak';
+                        }
                         row.appendChild(cell);
                     });
+
+                    // Dodanie przycisku usuwania i przycisku zwrotu w zależności od sekcji
+                    const actionCell = document.createElement('td');
+
+                    if (sectionId === 'readers') {
+                        const deleteButton = document.createElement('button');
+                        deleteButton.textContent = 'Usuń';
+                        deleteButton.className = 'delete-btn';
+                        deleteButton.dataset.cardNumber = item.numer_karty;
+                        actionCell.appendChild(deleteButton);
+                    } else if (sectionId === 'books') {
+                        const deleteButton = document.createElement('button');
+                        deleteButton.textContent = 'Usuń';
+                        deleteButton.className = 'delete-btn';
+                        deleteButton.dataset.bookId = item.id_ksiazki;
+                        actionCell.appendChild(deleteButton);
+                    } else if (sectionId === 'borrowings') {
+                        if (!item.data_zwrotu) {
+                            const returnButton = document.createElement('button');
+                            returnButton.textContent = 'Zwróć';
+                            returnButton.className = 'return-btn';
+                            returnButton.dataset.borrowId = item.id_wypozyczenia;
+                            actionCell.appendChild(returnButton);
+                        }
+
+                        const deleteButton = document.createElement('button');
+                        deleteButton.textContent = 'Usuń';
+                        deleteButton.className = 'delete-btn';
+                        deleteButton.dataset.borrowId = item.id_wypozyczenia;
+                        actionCell.appendChild(deleteButton);
+                    }
+                    row.appendChild(actionCell);
+
                     tbody.appendChild(row);
+                });
+
+                // Dodanie obsługi kliknięcia w przyciski usuwania
+                document.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        let apiUrl, data;
+                        if (button.dataset.cardNumber) {
+                            apiUrl = '/delete_reader';
+                            data = { card_num: button.dataset.cardNumber };
+                        } else if (button.dataset.bookId) {
+                            apiUrl = '/delete_book';
+                            data = { book_id: button.dataset.bookId };
+                        } else if (button.dataset.borrowId) {
+                            apiUrl = '/delete_borrowing';
+                            data = { borrow_id: button.dataset.borrowId };
+                        }
+
+                        fetch(apiUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: new URLSearchParams(data)
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                loadTableData(url, sectionId); // Odśwież tabelę
+                                if (sectionId === 'borrowings'){
+                                    loadTableData('/fetch_books', 'books')
+                                }
+
+                            } else {
+                                alert('Błąd podczas usuwania');
+                            }
+                        })
+                        .catch(error => console.error('Błąd podczas usuwania:', error));
+                    });
+                });
+
+                // Dodanie obsługi kliknięcia w przyciski zwrotu
+                document.querySelectorAll('.return-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const borrowId = button.dataset.borrowId;
+                        fetch('/return_borrow', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: new URLSearchParams({
+                                borrow_id: borrowId
+                            })
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                loadTableData(url, sectionId);
+                                loadTableData('/fetch_books', 'books')
+                            } else {
+                                alert('Błąd podczas zwracania wypożyczenia');
+                            }
+                        })
+                        .catch(error => console.error('Błąd podczas zwracania:', error));
+                    });
                 });
             })
             .catch(error => console.error('Błąd podczas pobierania danych:', error));

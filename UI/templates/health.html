@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Serwisów</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .service {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .online {
+            color: green;
+        }
+
+        .offline {
+            color: red;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .sub-status {
+            padding-left: 20px;
+        }
+
+        /* Stylizacja dla przycisku powrotu */
+        .back-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 20px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Przycisk Powrót -->
+    <a href="{{ url_for('index') }}">
+        <button class="back-button">Powrót</button>
+    </a>
+
+    <h1>Status Serwisów</h1>
+
+    {% for service, status in health_status.items() %}
+    <div class="service">
+        <p class="status">
+            Serwis {{ service }}:
+            <span class="{{ 'online' if status.status == 'ONLINE' else 'offline' }}">
+                {{ status.status }}
+            </span>
+        </p>
+        {% if status.status == 'ONLINE' %}
+        <div class="sub-status">
+            <p>
+                Baza danych:
+                <span class="{{ 'online' if status.database == 'online' else 'offline' }}">
+                    {{ status.database }}
+                </span>
+            </p>
+            <p>
+                RabbitMQ:
+                <span class="{{ 'online' if status.rabbitmq == 'online' else 'offline' }}">
+                    {{ status.rabbitmq }}
+                </span>
+            </p>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+</body>
+</html>

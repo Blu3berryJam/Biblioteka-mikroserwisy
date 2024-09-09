@@ -127,10 +127,11 @@ def publish_event(event):
 def add_book():
     data = request.form
     db = SessionLocal()
+    rok = data.get('rok_wydania', None)
     ksiazka = Ksiazka(
         tytul=data['tytul'],
-        autor=data['autor'],
-        rok_wydania=int(data['rok_wydania']),
+        autor=data.get('autor', None),
+        rok_wydania=int(rok) if rok else None,
         isbn=data['isbn'],
         kategoria=data['kategoria'],
         dostepnosc=True
@@ -179,7 +180,7 @@ def get_books():
     db = SessionLocal()
     ksiazki = db.query(Ksiazka).all()
     return jsonify([{
-        "id": ksiazka.id,
+        "id_ksiazki": ksiazka.id,
         "tytul": ksiazka.tytul,
         "autor": ksiazka.autor,
         "rok_wydania": ksiazka.rok_wydania,

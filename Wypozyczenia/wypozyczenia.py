@@ -173,7 +173,8 @@ def add_borrow():
     db = SessionLocal()
     wypozyczenie = Wypozyczenie(
         ksiazka_id=int(data["ksiazka_id"]),
-        data_wypozyczenia=datetime.now().date(),
+        data_wypozyczenia=datetime.strptime(
+            data.get("data_wypozyczenia", datetime.now()), "%Y-%m-%d").date(),
         data_zwrotu=None,
         czytelnik_id=int(data["czytelnik_id"]),
         private_id=get_current_id()
@@ -189,6 +190,7 @@ def add_borrow():
         }
     )
     start_time = time.time()
+    status = 200
     while True:
         if borrow_status.book is True and borrow_status.reader is True:
             db.add(wypozyczenie)
@@ -204,13 +206,15 @@ def add_borrow():
         elif borrow_status.book is False or borrow_status.reader is False:
             print("Nie udało się wypożyczyć!")
             clear_borrow_status()
+            status = 400
             break
         elif time.time() - start_time > 10:
             print("Limit czasu osiągnięty!")
             clear_borrow_status()
+            status = 408
             break
 
-    return redirect(url_for("view_borrowed_books"))
+    return redirect(url_for("view_borrowed_books")), status
 
 
 @app.route('/return_book', methods=['POST'])
@@ -241,9 +245,10 @@ def update_borrow(borrow_id):
     db = SessionLocal()
     wypozyczenie = db.query(Wypozyczenie).filter(Wypozyczenie.id == borrow_id).first()
     if wypozyczenie:
-        wypozyczenie.data_wypozyczenia = datetime.strptime(
-            data.get("data_wypozyczenia"), "%Y-%m-%d"
-        ).date()
+        if data.get("data_wypozyczenia"):
+            wypozyczenie.data_wypozyczenia = datetime.strptime(
+                data.get("data_wypozyczenia"), "%Y-%m-%d"
+            ).date()
         wypozyczenie.data_zwrotu = (
             datetime.strptime(data.get("data_zwrotu"), "%Y-%m-%d").date()
             if data.get("data_zwrotu")
@@ -278,7 +283,7 @@ def delete_borrow():
                     "book_id": wypozyczenie.ksiazka_id,
                 }
             )
-        return redirect(url_for("view_borrowed_books"))
+        return redirect(url_for("view_borrowed_books")), 202
     else:
         return "Wypożyczenie nie znalezione", 404
 
@@ -291,7 +296,7 @@ def get_borrowings():
         jsonify(
             [
                 {
-                    "id": wypozyczenie.id,
+                    "id_wypozyczenia": wypozyczenie.id,
                     "ksiazka_id": wypozyczenie.ksiazka_id,
                     "data_wypozyczenia": (
                         wypozyczenie.data_wypozyczenia.strftime("%Y-%m-%d")

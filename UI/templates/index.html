@@ -25,10 +25,10 @@
                     <th>Imię</th>
                     <th>Nazwisko</th>
                     <th>Data Urodzenia</th>
+                    <th>Akcje</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- Dane będą załadowane przez JavaScript -->
             </tbody>
         </table>
     </div>
@@ -39,6 +39,7 @@
             <div class="button-group">
                 <button class="toggle-btn" data-section="books">▼</button>
                 <button class="refresh-btn" data-url="{{ url_for('fetch_books') }}">🔄</button>
+                <a href="{{ url_for('add_book_form') }}" class="add-link">Dodaj Książkę</a>
             </div>
         </h2>
         <table id="booksTable" class="hidden">
@@ -51,10 +52,10 @@
                     <th>ISBN</th>
                     <th>Kategoria</th>
                     <th>Dostępność</th>
+                    <th>Akcje</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- Dane będą załadowane przez JavaScript -->
             </tbody>
         </table>
     </div>
@@ -65,6 +66,7 @@
             <div class="button-group">
                 <button class="toggle-btn" data-section="borrowings">▼</button>
                 <button class="refresh-btn" data-url="{{ url_for('fetch_borrowings') }}">🔄</button>
+                <a href="{{ url_for('add_borrowing_form') }}" class="add-link">Dodaj Wypożyczenie</a>
             </div>
         </h2>
         <table id="borrowingsTable" class="hidden">
@@ -74,13 +76,18 @@
                     <th>ID Książki</th>
                     <th>Data Wypożyczenia</th>
                     <th>Data Zwrotu</th>
-                    <th>ID Czytelnika</th>
+                    <th>Numer Karty Czytelnika</th>
+                    <th>Akcje</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- Dane będą załadowane przez JavaScript -->
             </tbody>
         </table>
+    </div>
+    <div style="text-align: center; margin-top: 50px;">
+        <a href="{{ url_for('health_page') }}">
+            <button style="padding: 10px 20px; font-size: 16px;">Health Check</button>
+        </a>
     </div>
 
     <script src="{{ url_for('static', filename='scripts.js') }}"></script>
